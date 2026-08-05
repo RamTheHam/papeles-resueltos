@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B6E4F">
+<meta name="description" content="Papeles Resueltos — fotografías cualquier formulario en papel y entiendes cada campo en español sencillo. MVP demo.">
+<title>Papeles Resueltos — Formularios, en español</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230B6E4F'/%3E%3Cpath d='M18 33l10 10 18-20' stroke='%23fff' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="appbar">
+    <button class="appbar-home" id="btn-home" aria-label="Inicio">
+      <span class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30"/><path d="M18 33l10 10 18-20"/></svg>
+      </span>
+      <span class="appbar-title">Papeles Resueltos</span>
+    </button>
+    <button class="appbar-back" id="btn-back" aria-label="Atrás" hidden>←</button>
+  </header>
+
+  <main>
+    <!-- ============ HOME ============ -->
+    <section class="screen" id="screen-home">
+      <div class="hero">
+        <p class="hero-kicker">Formularios, resueltos.</p>
+        <h1 class="hero-title">Nunca más te quedes <em>bloqueado</em> frente a un papel.</h1>
+        <p class="hero-sub">
+          Fotografía cualquier formulario y entiende cada campo en español sencillo:
+          qué significa, por qué importa y qué escribir.
+        </p>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-amber" id="btn-demo">
+          <span class="btn-ico">▶</span> Ver la demo — 10 segundos
+        </button>
+        <button class="btn btn-primary" id="btn-capture">
+          <span class="btn-ico">📷</span> Fotografiar mi formulario
+        </button>
+      </div>
+
+      <div class="card steps-card">
+        <h2 class="card-title">Así funciona</h2>
+        <ol class="steps">
+          <li><span class="step-num">1</span><span><b>Fotografía o elige</b> tu formulario en papel (o prueba con la demo).</span></li>
+          <li><span class="step-num">2</span><span><b>Leemos el texto</b> en tu teléfono — la foto no se sube a ningún servidor.</span></li>
+          <li><span class="step-num">3</span><span><b>Cada campo explicado</b> en español: qué significa, por qué importa y qué escribir.</span></li>
+        </ol>
+      </div>
+
+      <div class="card demo-card">
+        <h2 class="card-title">¿Sin un formulario a la mano?</h2>
+        <p>Prueba con el <b>formulario de ejemplo</b> (una solicitud de beneficios, como las reales de inmigración) y mira el momento mágico.</p>
+        <button class="btn btn-ghost" id="btn-demo-2">Ver formulario de ejemplo →</button>
+      </div>
+
+      <div class="card note-card">
+        <p class="note-title">Lo que esto es (y lo que todavía no es)</p>
+        <p>
+          Esta es una <b>demo MVP</b>: el reconocimiento de texto corre 100% en tu teléfono
+          y la explicación de campos es un <b>glosario curado</b> bilingüe. La versión con
+          inteligencia artificial que lee <i>cualquier</i> formulario y llena los campos
+          automáticamente llega en la próxima iteración.
+        </p>
+        <p class="note-small">Sin cuentas, sin claves de API, sin subir tus fotos. Los datos del formulario de ejemplo son ficticios.</p>
+      </div>
+    </section>
+
+    <!-- ============ DEMO ============ -->
+    <section class="screen" id="screen-demo" hidden>
+      <div class="screen-head">
+        <h1 class="screen-title">Formulario de ejemplo</h1>
+        <p class="screen-sub">
+          Una solicitud de beneficios, como las reales. Toca cualquier número para
+          entender ese campo, o deja que el recorrido te lo explique todo.
+        </p>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-tour">
+          <span class="btn-ico">▶</span> Explicar todo (recorrido)
+        </button>
+        <button class="btn btn-ghost" id="btn-fieldlist">Ver lista de campos</button>
+      </div>
+
+      <div id="demo-paper" class="paper" aria-label="Formulario de ejemplo"></div>
+
+      <div id="fieldlist" class="field-list" hidden>
+        <h2 class="card-title">Los 18 campos, explicados</h2>
+        <p class="screen-sub">Cada entrada: qué significa, por qué importa y un consejo.</p>
+        <div id="fieldlist-items"></div>
+      </div>
+    </section>
+
+    <!-- ============ CAPTURE ============ -->
+    <section class="screen" id="screen-capture" hidden>
+      <div class="screen-head">
+        <h1 class="screen-title">Fotografía tu formulario</h1>
+        <p class="screen-sub">
+          Usa la cámara o elige una foto de tu galería. Procura buena luz y que el
+          papel quede recto y completo.
+        </p>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-camera">
+          <span class="btn-ico">📷</span> Abrir cámara
+        </button>
+        <button class="btn btn-ghost" id="btn-gallery">
+          <span class="btn-ico">🖼</span> Elegir de la galería
+        </button>
+      </div>
+
+      <input type="file" id="file-camera" accept="image/*" capture="environment" hidden>
+      <input type="file" id="file-gallery" accept="image/*" hidden>
+
+      <div id="capture-preview-wrap" class="preview-wrap" hidden>
+        <img id="capture-preview" alt="Vista previa de tu formulario">
+        <button class="btn btn-primary" id="btn-read">
+          <span class="btn-ico">🔍</span> Leer este formulario
+        </button>
+      </div>
+
+      <div class="card note-card">
+        <p class="note-title">Tu privacidad</p>
+        <p>
+          El reconocimiento de texto (OCR) corre en tu dispositivo con
+          <b>Tesseract.js</b>. Tu foto <b>no se sube a ningún servidor</b> ni se
+          guarda. Necesitas conexión solo para cargar el motor de lectura la
+          primera vez.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ RESULTS ============ -->
+    <section class="screen" id="screen-results" hidden>
+      <div class="screen-head">
+        <h1 class="screen-title" id="results-title">Leyendo tu formulario…</h1>
+        <p class="screen-sub" id="results-sub">Esto toma unos segundos.</p>
+      </div>
+
+      <div id="ocr-progress" class="card progress-card">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <p class="progress-status" id="progress-status">Preparando…</p>
+      </div>
+
+      <div id="ocr-result" hidden>
+        <div class="card summary-card" id="summary-card" hidden>
+          <p id="summary-text"></p>
+        </div>
+        <h2 class="card-title" id="matched-title">Campos que reconocemos</h2>
+        <div id="matched-list" class="match-list"></div>
+
+        <div class="card note-card" id="unmatched-card" hidden>
+          <p class="note-title">Lo que todavía no reconocemos</p>
+          <p id="unmatched-intro"></p>
+          <pre id="unmatched-lines" class="unmatched-lines"></pre>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-again">Fotografiar otro</button>
+          <button class="btn btn-amber" id="btn-demo-3">Probar con la demo →</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="honesty" aria-label="Nota de demo">
+    <span class="honesty-badge">MVP demo</span>
+    <span>Explicación de campos = glosario curado. La versión con IA (lectura total + auto-llenado) llega en la próxima iteración. Sin claves, sin subir tus fotos.</span>
+  </footer>
+
+</div>
+
+<!-- Bottom sheet -->
+<div class="sheet-overlay" id="sheet-overlay" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-en" hidden>
+  <button class="sheet-close" id="sheet-close" aria-label="Cerrar">✕</button>
+  <div class="sheet-body">
+    <p class="sheet-tag" id="sheet-tag"></p>
+    <h2 class="sheet-en" id="sheet-en"></h2>
+    <p class="sheet-es" id="sheet-es"></p>
+    <div class="sheet-section">
+      <h3>Qué significa</h3>
+      <p id="sheet-explain"></p>
+    </div>
+    <div class="sheet-section">
+      <h3>Por qué importa</h3>
+      <p id="sheet-why"></p>
+    </div>
+    <div class="sheet-section">
+      <h3>Consejo</h3>
+      <p id="sheet-tip"></p>
+    </div>
+    <p class="sheet-note" id="sheet-note"></p>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="js/glossary.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
