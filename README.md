@@ -52,3 +52,29 @@ modelos de idioma (eng+spa) desde la CDN.
 
 Inicializado con `git init` + commit inicial. Listo para publicar en
 GitHub Pages (rama `main` o `gh-pages`).
+
+## Desarrollo y pruebas
+
+Para servir la app: `npm ci` y `npm run serve` (http://127.0.0.1:4173).
+La aplicación publicada sigue siendo estática y no necesita Node ni backend.
+
+Para verificar los recorridos: `npm run check`,
+`npx playwright install chromium --with-deps`, y `npm run test:e2e`.
+Requiere Node 22.12 o posterior. Las pruebas usan el runner real
+[tester-army/e2e](https://github.com/tester-army/e2e), con versiones fijadas,
+sin modelo ni claves de API. La telemetría del runner está desactivada.
+
+Se prueban escritorio y vista móvil: los 18 campos de ejemplo, los 27 campos
+del glosario, el recorrido completo, navegación, teclado/accesibilidad,
+captura/subida y todos los estados de lectura. Las pruebas de fallos usan
+respuestas controladas. También se ejecuta una subida real de una imagen
+sintética bilingüe con Tesseract.js/WASM y los modelos oficiales de inglés y
+español, distribuidos por npm y servidos localmente durante la prueba. Esto
+valida la integración real de lectura y glosario en esa imagen; no garantiza
+precisión en cualquier formulario ni valida la cámara nativa o la CDN pública.
+Véase [el informe de cobertura](tests/AUDIT.md).
+
+La hoja de explicación mantiene el foco del teclado; cerrar también detiene
+el recorrido. Puedes avanzar o retroceder en el recorrido, cancelar una lectura
+y volver a intentarla. Al salir hacia inicio o demo se descartan la foto y el
+texto leído de la sesión. Las líneas no reconocidas se muestran completas.

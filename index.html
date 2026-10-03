@@ -87,7 +87,7 @@
         <button class="btn btn-primary" id="btn-tour">
           <span class="btn-ico">▶</span> Explicar todo (recorrido)
         </button>
-        <button class="btn btn-ghost" id="btn-fieldlist">Ver lista de campos</button>
+        <button class="btn btn-ghost" id="btn-fieldlist" aria-expanded="false" aria-controls="fieldlist">Ver lista de campos</button>
       </div>
 
       <div id="demo-paper" class="paper" aria-label="Formulario de ejemplo"></div>
@@ -118,8 +118,8 @@
         </button>
       </div>
 
-      <input type="file" id="file-camera" accept="image/*" capture="environment" hidden>
-      <input type="file" id="file-gallery" accept="image/*" hidden>
+      <input type="file" id="file-camera" aria-label="Foto de la cámara" accept="image/*" capture="environment" hidden>
+      <input type="file" id="file-gallery" aria-label="Foto de la galería" accept="image/*" hidden>
 
       <div id="capture-preview-wrap" class="preview-wrap" hidden>
         <img id="capture-preview" alt="Vista previa de tu formulario">
@@ -148,12 +148,13 @@
 
       <div id="ocr-progress" class="card progress-card">
         <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-        <p class="progress-status" id="progress-status">Preparando…</p>
+        <p class="progress-status" id="progress-status" role="status" aria-live="polite">Preparando…</p>
+        <button class="btn btn-ghost" id="btn-cancel-ocr">Cancelar lectura</button>
       </div>
 
       <div id="ocr-result" hidden>
         <div class="card summary-card" id="summary-card" hidden>
-          <p id="summary-text"></p>
+          <p id="summary-text" role="status"></p>
         </div>
         <h2 class="card-title" id="matched-title">Campos que reconocemos</h2>
         <div id="matched-list" class="match-list"></div>
@@ -161,7 +162,7 @@
         <div class="card note-card" id="unmatched-card" hidden>
           <p class="note-title">Lo que todavía no reconocemos</p>
           <p id="unmatched-intro"></p>
-          <pre id="unmatched-lines" class="unmatched-lines"></pre>
+          <pre id="unmatched-lines" class="unmatched-lines" role="region" aria-label="Texto no reconocido" tabindex="0"></pre>
         </div>
 
         <div class="btn-row">
@@ -183,6 +184,14 @@
 <div class="sheet-overlay" id="sheet-overlay" hidden></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-en" hidden>
   <button class="sheet-close" id="sheet-close" aria-label="Cerrar">✕</button>
+  <div id="sheet-tour" class="sheet-tour" hidden>
+    <p id="sheet-tour-count" role="status" aria-live="polite"></p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="sheet-tour-prev">Campo anterior</button>
+      <button class="btn btn-primary" id="sheet-tour-next">Siguiente campo</button>
+      <button class="btn btn-ghost" id="sheet-tour-stop">Detener recorrido</button>
+    </div>
+  </div>
   <div class="sheet-body">
     <p class="sheet-tag" id="sheet-tag"></p>
     <h2 class="sheet-en" id="sheet-en"></h2>
@@ -203,7 +212,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="alert" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="js/glossary.js"></script>

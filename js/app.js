@@ -14,22 +14,37 @@
     tourTimer: null,
     tourIndex: -1,
     currentFile: null,
-    ocrRunning: false
+    ocrRunning: false,
+    ocrJob: null,
+    resultsAvailable: false,
+    fileVersion: 0,
+    sheetOpener: null
   };
 
   const $ = function (sel) { return document.querySelector(sel); };
   const $$ = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); };
 
   /* ---------- Navegación ---------- */
-  function showScreen(name) {
+  function showScreen(name, fromHistory) {
+    if (name === "results" && fromHistory && !state.ocrRunning && !state.resultsAvailable) {
+      name = "capture";
+      history.replaceState({ screen: name }, "");
+    }
+    if (name !== "results") cancelOCR();
+    if (name === "home" || name === "demo") clearCapture();
     state.screen = name;
     stopTour();
-    closeSheet();
+    closeSheet(false);
     $$(".screen").forEach(function (s) { s.hidden = true; });
     const el = document.getElementById("screen-" + name);
     if (el) el.hidden = false;
     $("#btn-back").hidden = (name === "home");
-    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    if (!fromHistory && history.state && history.state.screen !== name) {
+      history.pushState({ screen: name }, "");
+    }
+    window.scrollTo({ top: 0, behavior: "auto" });
+    const heading = el && el.querySelector("h1");
+    if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
   }
 
   /* ---------- Hoja inferior ---------- */
@@ -57,16 +72,28 @@
         : "Este campo aparece en el glosario; la explicación es la misma para cualquier formulario.";
     }
 
+    const wasHidden = $("#sheet").hidden;
+    if (wasHidden) state.sheetOpener = document.activeElement;
     $("#sheet").hidden = false;
     $("#sheet-overlay").hidden = false;
     document.body.style.overflow = "hidden";
+    $(".app").inert = true;
+    if (wasHidden) $("#sheet-close").focus({ preventScroll: true });
   }
 
-  function closeSheet() {
+  function closeSheet(restoreFocus) {
+    const wasOpen = !$("#sheet").hidden;
     $("#sheet").hidden = true;
     $("#sheet-overlay").hidden = true;
+    $(".app").inert = false;
     document.body.style.overflow = "";
+    if (wasOpen && restoreFocus !== false && state.sheetOpener && state.sheetOpener.isConnected) {
+      state.sheetOpener.focus({ preventScroll: true });
+    }
+    state.sheetOpener = null;
   }
+
+  function dismissSheet() { stopTour(); closeSheet(); }
 
   /* ---------- Recorrido guiado (demo) ---------- */
   function startTour() {
@@ -75,6 +102,7 @@
 
     state.tourActive = true;
     state.tourIndex = -1;
+    $("#sheet-tour").hidden = false;
     $("#btn-tour").innerHTML = '<span class="btn-ico">⏸</span> Detener recorrido';
     stepTour();
   }
@@ -88,6 +116,9 @@
     refs.forEach(function (r, i) { r.cell.classList.toggle("is-live", i === state.tourIndex); });
     const current = refs[state.tourIndex];
     current.cell.scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#sheet-tour-count").textContent = "Campo " + (state.tourIndex + 1) + " de " + refs.length;
+    $("#sheet-tour-prev").disabled = state.tourIndex === 0;
+    $("#sheet-tour-next").textContent = state.tourIndex === refs.length - 1 ? "Terminar recorrido" : "Siguiente campo";
     openSheetForField(current.fid, "demo", current.data, true); // keepTour: no se auto-detiene
 
     state.tourTimer = setTimeout(stepTour, 3200);
@@ -95,6 +126,9 @@
 
   function stopTour() {
     state.tourActive = false;
+    const focusInTour = $("#sheet-tour").contains(document.activeElement);
+    $("#sheet-tour").hidden = true;
+    if (focusInTour && !$("#sheet").hidden) $("#sheet-close").focus({ preventScroll: true });
     if (state.tourTimer) { clearTimeout(state.tourTimer); state.tourTimer = null; }
     state.tourIndex = -1;
     if (window.__demoCellRefs) {
@@ -115,18 +149,44 @@
   }
 
   /* ---------- Captura de imagen ---------- */
+  function clearCapture() {
+    state.fileVersion++;
+    state.currentFile = null;
+    state.lastOcrText = "";
+    state.resultsAvailable = false;
+    $("#capture-preview").removeAttribute("src");
+    $("#capture-preview-wrap").hidden = true;
+    $("#matched-list").replaceChildren();
+    $("#unmatched-lines").textContent = "";
+    $("#sheet-note").textContent = "";
+    $("#summary-text").textContent = "";
+  }
+
   function handleFile(file) {
-    if (!file || !/^image\//.test(file.type)) {
+    if (!file) return; // Canceling the system picker leaves the current photo alone.
+    clearCapture();
+    if (!/^image\//.test(file.type)) {
       showToast("Elige una foto (JPG, PNG o similar).");
       return;
     }
-    state.currentFile = file;
+    const version = state.fileVersion;
     const reader = new FileReader();
+    reader.onerror = function () { showToast("No pudimos abrir esa foto. Elige otra imagen."); };
     reader.onload = function (e) {
+      if (version !== state.fileVersion || state.screen !== "capture") return;
       const img = $("#capture-preview");
+      img.onload = function () {
+        if (version !== state.fileVersion) return;
+        state.currentFile = file;
+        $("#capture-preview-wrap").hidden = false;
+        img.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      };
+      img.onerror = function () {
+        if (version !== state.fileVersion) return;
+        clearCapture();
+        showToast("No pudimos abrir esa foto. Elige otra imagen.");
+      };
       img.src = e.target.result;
-      $("#capture-preview-wrap").hidden = false;
-      img.scrollIntoView({ behavior: "smooth", block: "nearest" });
     };
     reader.readAsDataURL(file);
   }
@@ -137,33 +197,54 @@
     $("#progress-fill").style.width = Math.max(4, Math.round((progress == null ? 0 : progress) * 100)) + "%";
   }
 
+  async function releaseWorker(job) {
+    if (!job.worker || job.terminated) return;
+    job.terminated = true;
+    try { await job.worker.terminate(); } catch (_) { /* A cancelled worker may already be stopped. */ }
+  }
+
+  function cancelOCR() {
+    const job = state.ocrJob;
+    if (!job) return;
+    job.cancelled = true;
+    state.ocrJob = null;
+    state.ocrRunning = false;
+    void releaseWorker(job);
+  }
+
+  function renderOCRError(message) {
+    state.resultsAvailable = true;
+    $("#results-title").textContent = "No pudimos leer tu formulario";
+    $("#results-sub").textContent = "Puedes elegir otra foto o probar la demo.";
+    $("#ocr-progress").hidden = true;
+    $("#ocr-result").hidden = false;
+    $("#summary-card").hidden = false;
+    $("#summary-text").textContent = message;
+    $("#matched-title").textContent = "";
+    $("#matched-list").replaceChildren();
+    $("#unmatched-card").hidden = true;
+  }
+
   async function runOCR(file) {
     if (state.ocrRunning) return;
     state.ocrRunning = true;
-
-    if (!window.Tesseract) {
-      showScreen("results");
-      $("#ocr-progress").hidden = true;
-      $("#ocr-result").hidden = false;
-      $("#summary-card").hidden = false;
-      $("#summary-text").textContent =
-        "El motor de lectura (Tesseract.js) no se pudo cargar desde la CDN. Revisa tu conexión a internet o prueba con la demo.";
-      $("#matched-title").textContent = "";
-      $("#matched-list").innerHTML = "";
-      $("#unmatched-card").hidden = true;
-      state.ocrRunning = false;
-      return;
-    }
-
+    state.resultsAvailable = false;
+    const job = { worker: null, cancelled: false, terminated: false };
+    state.ocrJob = job;
     showScreen("results");
+    $("#results-title").textContent = "Leyendo tu formulario…";
+    $("#results-sub").textContent = "Esto toma unos segundos. Puedes cancelar la lectura.";
     $("#ocr-progress").hidden = false;
     $("#ocr-result").hidden = true;
     setOCRProgress("Preparando lector…", 0.05);
-
     try {
-      const worker = await Tesseract.createWorker(["eng", "spa"], 1, {
+      if (!window.Tesseract) {
+        renderOCRError("El motor de lectura (Tesseract.js) no se pudo cargar desde la CDN. Revisa tu conexión a internet o prueba con la demo.");
+        return;
+      }
+      job.worker = await Tesseract.createWorker(["eng", "spa"], 1, {
         logger: function (m) {
-          if (!m || !m.status) return;
+          if (job.cancelled || !m || !m.status) return;
           const labels = {
             "loading tesseract core": "Cargando el motor de lectura",
             "initializing tesseract": "Inicializando lector",
@@ -174,34 +255,31 @@
           setOCRProgress(labels[m.status] || m.status, m.progress);
         }
       });
-
+      if (job.cancelled) return;
       setOCRProgress("Leyendo tu formulario…", 0.6);
-      const { data } = await worker.recognize(file);
-      await worker.terminate();
-
+      const { data } = await job.worker.recognize(file);
+      if (job.cancelled) return;
       state.lastOcrText = data.text || "";
       renderResults(state.lastOcrText);
-    } catch (err) {
-      console.error("OCR error:", err);
-      $("#ocr-progress").hidden = true;
-      $("#ocr-result").hidden = false;
-      $("#summary-card").hidden = false;
-      $("#summary-text").textContent =
-        "No pudimos leer esa imagen. Prueba con mejor luz, acercando la cámara y enderezando el papel — o usa la demo.";
-      $("#matched-title").textContent = "";
-      $("#matched-list").innerHTML = "";
-      $("#unmatched-card").hidden = true;
+    } catch (_) {
+      if (!job.cancelled) renderOCRError("No pudimos leer esa imagen. Prueba con mejor luz, acercando la cámara y enderezando el papel — o usa la demo.");
     } finally {
-      state.ocrRunning = false;
+      await releaseWorker(job);
+      if (state.ocrJob === job) {
+        state.ocrJob = null;
+        state.ocrRunning = false;
+      }
     }
   }
 
   function renderResults(text) {
+    state.resultsAvailable = true;
     $("#ocr-progress").hidden = true;
     $("#ocr-result").hidden = false;
 
     const matched = matchFields(text);
-    const matchedIds = matched.map(function (f) { return f.id; });
+    $("#results-title").textContent = "Tu formulario, explicado";
+    $("#results-sub").textContent = text.trim() ? "Revisa los campos y el texto que todavía no reconocemos." : "No se detectó texto. Prueba con una foto más clara.";
 
     // Resumen
     $("#summary-card").hidden = false;
@@ -260,6 +338,12 @@
         why.innerHTML = "<b>Por qué importa:</b> " + f.why;
         item.appendChild(why);
 
+        const detail = document.createElement("button");
+        detail.className = "btn btn-ghost";
+        detail.textContent = "Ver explicación y consejo";
+        detail.setAttribute("aria-label", "Explicar " + f.es);
+        detail.addEventListener("click", function () { openSheetForField(f.id, "photo"); });
+        item.appendChild(detail);
         list.appendChild(item);
       });
     }
@@ -270,7 +354,7 @@
     if (um.length) {
       $("#unmatched-intro").textContent =
         "Estas líneas de tu foto no están en nuestro glosario todavía (la versión con IA las leerá todas). No las borres de tu original: algunas pueden ser importantes.";
-      $("#unmatched-lines").textContent = um.slice(0, 14).join("\n");
+      $("#unmatched-lines").textContent = um.join("\n");
     }
 
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -280,7 +364,8 @@
   function bindEvents() {
     // Navegación
     $("#btn-home").addEventListener("click", function () { showScreen("home"); });
-    $("#btn-back").addEventListener("click", function () { showScreen("home"); });
+    $("#btn-back").addEventListener("click", function () { history.back(); });
+    window.addEventListener("popstate", function (e) { showScreen(e.state && e.state.screen || "home", true); });
     $("#btn-demo").addEventListener("click", function () { showScreen("demo"); });
     $("#btn-demo-2").addEventListener("click", function () { showScreen("demo"); });
     $("#btn-demo-3").addEventListener("click", function () { showScreen("demo"); });
@@ -293,6 +378,8 @@
     $("#btn-fieldlist").addEventListener("click", function () {
       const fl = $("#fieldlist");
       fl.hidden = !fl.hidden;
+      $("#btn-fieldlist").textContent = fl.hidden ? "Ver lista de campos" : "Ocultar lista de campos";
+      $("#btn-fieldlist").setAttribute("aria-expanded", String(!fl.hidden));
       if (!fl.hidden) fl.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
@@ -311,17 +398,33 @@
       if (state.currentFile) runOCR(state.currentFile);
     });
     $("#btn-again").addEventListener("click", function () {
-      state.currentFile = null;
-      $("#capture-preview").removeAttribute("src");
-      $("#capture-preview-wrap").hidden = true;
+      clearCapture();
       showScreen("capture");
     });
 
     // Hoja inferior
-    $("#sheet-close").addEventListener("click", closeSheet);
-    $("#sheet-overlay").addEventListener("click", closeSheet);
+    $("#btn-cancel-ocr").addEventListener("click", function () { cancelOCR(); showScreen("capture"); });
+    $("#sheet-close").addEventListener("click", dismissSheet);
+    $("#sheet-overlay").addEventListener("click", dismissSheet);
+    $("#sheet-tour-stop").addEventListener("click", dismissSheet);
+    $("#sheet-tour-next").addEventListener("click", function () {
+      clearTimeout(state.tourTimer);
+      if (state.tourIndex === window.__demoCellRefs.length - 1) dismissSheet();
+      else stepTour();
+    });
+    $("#sheet-tour-prev").addEventListener("click", function () {
+      clearTimeout(state.tourTimer);
+      state.tourIndex -= 2;
+      stepTour();
+    });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") { closeSheet(); stopTour(); }
+      if (e.key === "Escape") { dismissSheet(); }
+      if (e.key === "Tab" && !$("#sheet").hidden) {
+        const controls = $$("#sheet button").filter(function (el) { return !el.disabled && el.getClientRects().length; });
+        const first = controls[0], last = controls[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     });
 
     // Delegación: tocar una celda del formulario de ejemplo abre su explicación
@@ -348,7 +451,8 @@
     renderDemoPaper();
     renderFieldList();
     bindEvents();
-    showScreen("home");
+    history.replaceState({ screen: "home" }, "");
+    showScreen("home", true);
   }
 
   if (document.readyState === "loading") {
